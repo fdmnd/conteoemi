@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Conteo Emi</title>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <style>
+        :root {
+            --bg-color: #f4f7f6;
+            --primary: #4A90E2;
+            --materna-color: #ff9a9e;
+            --formula-color: #a1c4fd;
+            --text-main: #333;
+            --card-bg: #fff;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            padding-bottom: 70px; /* Espacio para la barra de navegación */
+        }
+        .container {
+            padding: 20px;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+        h2 { text-align: center; margin-top: 10px; }
+        
+        /* Estilos de Login */
+        #pantalla-login {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+
+        /* Estilos de Formulario y Botones */
+        label { font-weight: bold; font-size: 1.1rem; }
+        input[type="datetime-local"], input[type="number"] {
+            width: 100%;
+            padding: 15px;
+            margin: 10px 0 25px 0;
+            border: 1px solid #ccc;
+            border-radius: 10px;
+            font-size: 1.2rem;
+            box-sizing: border-box;
+        }
+        
+        /* Botones de selección de leche (Radio Buttons ocultos) */
+        .tipo-leche-container {
+            display: flex;
+            gap: 15px;
+            margin: 10px 0 25px 0;
+        }
+        .tipo-leche-container input[type="radio"] { display: none; }
+        .tipo-leche-container label {
+            flex: 1;
+            padding: 20px;
+            text-align: center;
+            background-color: #e0e0e0;
+            border-radius: 15px;
+            font-size: 1.2rem;
+            color: #555;
+            transition: 0.2s;
+        }
+        #materna:checked + label { background-color: var(--materna-color); color: #000; font-weight: bold; border: 2px solid #ff758c; }
+        #formula:checked + label { background-color: var(--formula-color); color: #000; font-weight: bold; border: 2px solid #8fd3f4; }
+
+        .btn-guardar {
+            width: 100%;
+            padding: 18px;
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.3rem;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+        .btn-guardar:active { background-color: #357ABD; }
+        #mensaje-estado { text-align: center; font-weight: bold; margin-top: 15px; color: #d9534f; }
+
+        /* Barra de Navegación Inferior */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+            background-color: var(--card-bg);
+            display: none; /* Se muestra post-login */
+            justify-content: space-around;
+            padding: 10px 0;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+        }
+        .nav-item {
+            text-align: center;
+            font-size: 1rem;
+            color: #777;
+            flex: 1;
+            padding: 10px 0;
+        }
+        .nav-item.active { color: var(--primary); font-weight: bold; }
+        
+        /* Ocultar vistas */
+        .vista { display: none; }
+        .vista.activa { display: block; }
+    </style>
+</head>
+<body>
+
+    <!-- PANTALLA LOGIN -->
+    <div id="pantalla-login" class="container">
+        <h2>Conteo Leche Emi</h2>
+        <div id="g_id_onload"
+             data-client_id="870110774821-8srkkjbcsa4upcth1j7kngfvrf7q8f5h.apps.googleusercontent.com"
+             data-context="signin"
+             data-ux_mode="popup"
+             data-callback="handleCredentialResponse"
+             data-auto_prompt="false">
+        </div>
+        <div class="g_id_signin" data-type="standard" data-size="large" data-theme="outline" data-text="sign_in_with" data-shape="rectangular" data-logo_alignment="left"></div>
+    </div>
+
+    <!-- VISTAS DE LA APP -->
+    <div id="pantalla-app" style="display: none;">
+        
+        <!-- Vista 1: REGISTRO -->
+        <div id="vista-registro" class="vista activa container">
+            <h2>Nueva Toma</h2>
+            
+            <label>Fecha y Hora:</label>
+            <input type="datetime-local" id="fechaHora" required>
+            
+            <label>Tipo de Leche:</label>
+            <div class="tipo-leche-container">
+                <input type="radio" id="materna" name="tipoLeche" value="Materna" checked>
+                <label for="materna">Materna</label>
+                
+                <input type="radio" id="formula" name="tipoLeche" value="Fórmula">
+                <label for="formula">Fórmula</label>
+            </div>
+            
+            <label>Cantidad (ml):</label>
+            <input type="number" id="cantidadMl" inputmode="numeric" pattern="[0-9]*" placeholder="Ej: 90" required>
+            
+            <button class="btn-guardar" onclick="registrarToma()">Guardar Toma</button>
+            <p id="mensaje-estado"></p>
+        </div>
+
+        <!-- Vista 2: RESUMEN (Estructura base) -->
+        <div id="vista-resumen" class="vista container">
+            <h2>Resumen Diario</h2>
+            <p>Cargando datos del día...</p>
+            <!-- Aquí inyectaremos los datos con JS en el próximo paso -->
+        </div>
+
+        <!-- Vista 3: HISTORIAL (Estructura base) -->
+        <div id="vista-historial" class="vista container">
+            <h2>Historial por Mes</h2>
+            <p>Cargando historial...</p>
+            <!-- Aquí inyectaremos los datos con JS en el próximo paso -->
+        </div>
+
+    </div>
+
+    <!-- NAVEGACIÓN INFERIOR -->
+    <div id="bottom-nav" class="bottom-nav">
+        <div class="nav-item active" onclick="cambiarVista('vista-registro', this)">Registro</div>
+        <div class="nav-item" onclick="cambiarVista('vista-resumen', this)">Resumen</div>
+        <div class="nav-item" onclick="cambiarVista('vista-historial', this)">Historial</div>
+    </div>
+
+    <script>
+        let tokenActivo = null;
+        const urlBackend = "TU_URL_DE_APPS_SCRIPT"; // REEMPLAZAR AQUÍ
+
+        // Ajustar hora local al cargar
+        function setearHoraActual() {
+            const now = new Date();
+            now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+            document.getElementById('fechaHora').value = now.toISOString().slice(0,16);
+        }
+        setearHoraActual();
+
+        // Control de Pestañas
+        function cambiarVista(idVista, elementoNav) {
+            document.querySelectorAll('.vista').forEach(el => el.classList.remove('activa'));
+            document.getElementById(idVista).classList.add('activa');
+            
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            elementoNav.classList.add('active');
+
+            if(idVista === 'vista-resumen' || idVista === 'vista-historial') {
+                // En el próximo paso agregaremos la función para solicitar los datos a Google Sheets
+                console.log("Solicitando datos al servidor..."); 
+            }
+        }
+
+        // Login Google
+        function handleCredentialResponse(response) {
+            tokenActivo = response.credential;
+            document.getElementById('pantalla-login').style.display = 'none';
+            document.getElementById('pantalla-app').style.display = 'block';
+            document.getElementById('bottom-nav').style.display = 'flex';
+        }
+
+        // Guardar Datos
+        async function registrarToma() {
+            if (!tokenActivo) {
+                alert("La sesión expiró. Vuelve a iniciar sesión.");
+                location.reload();
+                return;
+            }
+
+            const fechaHora = document.getElementById('fechaHora').value;
+            const tipoLeche = document.querySelector('input[name="tipoLeche"]:checked').value;
+            const ml = document.getElementById('cantidadMl').value;
+            const msjEstado = document.getElementById('mensaje-estado');
+
+            if(!fechaHora || !ml) {
+                msjEstado.innerText = "Por favor ingresa los mililitros.";
+                msjEstado.style.color = "#d9534f";
+                return;
+            }
+
+            msjEstado.innerText = "Guardando registro...";
+            msjEstado.style.color = "#333";
+
+            const payload = {
+                accion: "registrar",
+                token: tokenActivo,
+                fechaHora: fechaHora,
+                tipoLeche: tipoLeche,
+                ml: parseInt(ml)
+            };
+
+            try {
+                const response = await fetch(urlBackend, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify(payload)
+                });
+                
+                const data = await response.json();
+                
+                if (data.status === "ok") {
+                    msjEstado.innerText = "¡Toma guardada exitosamente!";
+                    msjEstado.style.color = "green";
+                    document.getElementById('cantidadMl').value = ''; 
+                    setearHoraActual(); // Reinicia la hora actual
+                    setTimeout(() => { msjEstado.innerText = ""; }, 3000);
+                } else {
+                    msjEstado.innerText = "Error: " + data.error;
+                }
+            } catch (error) {
+                msjEstado.innerText = "Error de conexión. Revisa tu internet.";
+                msjEstado.style.color = "#d9534f";
+            }
+        }
+    </script>
+</body>
+</html>
