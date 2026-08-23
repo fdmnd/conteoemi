@@ -20,16 +20,15 @@
             color: var(--text-main);
             margin: 0;
             padding: 0;
-            padding-bottom: 70px; /* Espacio para la barra de navegación */
+            padding-bottom: 70px;
         }
         .container {
             padding: 20px;
             max-width: 500px;
             margin: 0 auto;
         }
-        h2 { text-align: center; margin-top: 10px; }
+        h2 { text-align: center; margin-top: 10px; color: var(--primary); }
         
-        /* Estilos de Login */
         #pantalla-login {
             display: flex;
             flex-direction: column;
@@ -38,7 +37,6 @@
             height: 100vh;
         }
 
-        /* Estilos de Formulario y Botones */
         label { font-weight: bold; font-size: 1.1rem; }
         input[type="datetime-local"], input[type="number"] {
             width: 100%;
@@ -50,7 +48,6 @@
             box-sizing: border-box;
         }
         
-        /* Botones de selección de leche (Radio Buttons ocultos) */
         .tipo-leche-container {
             display: flex;
             gap: 15px;
@@ -82,15 +79,42 @@
             margin-top: 10px;
         }
         .btn-guardar:active { background-color: #357ABD; }
-        #mensaje-estado { text-align: center; font-weight: bold; margin-top: 15px; color: #d9534f; }
+        #mensaje-estado { text-align: center; font-weight: bold; margin-top: 15px; }
 
-        /* Barra de Navegación Inferior */
+        /* Estilos para Resumen e Historial */
+        .tarjeta-dia {
+            background-color: var(--card-bg);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            border-left: 5px solid var(--primary);
+        }
+        .tarjeta-dia h3 { margin: 0 0 10px 0; font-size: 1.2rem; }
+        .fila-resumen { display: flex; justify-content: space-between; font-size: 1.1rem; margin-bottom: 5px; }
+        .total-resumen { font-weight: bold; border-top: 1px solid #eee; padding-top: 5px; margin-top: 5px; }
+        
+        .mes-header {
+            background-color: #e0e0e0;
+            padding: 8px 15px;
+            border-radius: 5px;
+            font-weight: bold;
+            margin: 20px 0 10px 0;
+            text-align: center;
+        }
+        .toma-detalle {
+            font-size: 0.95rem;
+            color: #555;
+            padding: 3px 0;
+            border-bottom: 1px dashed #eee;
+        }
+
         .bottom-nav {
             position: fixed;
             bottom: 0;
             width: 100%;
             background-color: var(--card-bg);
-            display: none; /* Se muestra post-login */
+            display: none;
             justify-content: space-around;
             padding: 10px 0;
             box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
@@ -104,14 +128,12 @@
         }
         .nav-item.active { color: var(--primary); font-weight: bold; }
         
-        /* Ocultar vistas */
         .vista { display: none; }
         .vista.activa { display: block; }
     </style>
 </head>
 <body>
 
-    <!-- PANTALLA LOGIN -->
     <div id="pantalla-login" class="container">
         <h2>Conteo Leche Emi</h2>
         <div id="g_id_onload"
@@ -124,10 +146,8 @@
         <div class="g_id_signin" data-type="standard" data-size="large" data-theme="outline" data-text="sign_in_with" data-shape="rectangular" data-logo_alignment="left"></div>
     </div>
 
-    <!-- VISTAS DE LA APP -->
     <div id="pantalla-app" style="display: none;">
         
-        <!-- Vista 1: REGISTRO -->
         <div id="vista-registro" class="vista activa container">
             <h2>Nueva Toma</h2>
             
@@ -150,23 +170,23 @@
             <p id="mensaje-estado"></p>
         </div>
 
-        <!-- Vista 2: RESUMEN (Estructura base) -->
         <div id="vista-resumen" class="vista container">
             <h2>Resumen Diario</h2>
-            <p>Cargando datos del día...</p>
-            <!-- Aquí inyectaremos los datos con JS en el próximo paso -->
+            <input type="date" id="fechaSelector" onchange="renderizarResumen()" style="width: 100%; padding: 10px; margin-bottom: 20px; font-size: 1.1rem; border-radius: 5px; border: 1px solid #ccc;">
+            <div id="contenido-resumen">
+                <p style="text-align:center;">Cargando datos...</p>
+            </div>
         </div>
 
-        <!-- Vista 3: HISTORIAL (Estructura base) -->
         <div id="vista-historial" class="vista container">
             <h2>Historial por Mes</h2>
-            <p>Cargando historial...</p>
-            <!-- Aquí inyectaremos los datos con JS en el próximo paso -->
+            <div id="contenido-historial">
+                <p style="text-align:center;">Cargando datos...</p>
+            </div>
         </div>
 
     </div>
 
-    <!-- NAVEGACIÓN INFERIOR -->
     <div id="bottom-nav" class="bottom-nav">
         <div class="nav-item active" onclick="cambiarVista('vista-registro', this)">Registro</div>
         <div class="nav-item" onclick="cambiarVista('vista-resumen', this)">Resumen</div>
@@ -175,31 +195,25 @@
 
     <script>
         let tokenActivo = null;
-        const urlBackend = "TU_URL_DE_APPS_SCRIPT"; // REEMPLAZAR AQUÍ
+        let datosCacheados = []; 
+        const urlBackend = "https://script.google.com/macros/s/AKfycby8FqN0jTCv4P7NIOu6QY655dujzkXGbLCnC3rEQ0wIgNSl4bvsMpoEcfWkAS4wX8gtbg/exec";
 
-        // Ajustar hora local al cargar
+        // --- FUNCIONES DE UTILIDAD PARA FECHAS ---
         function setearHoraActual() {
             const now = new Date();
             now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
             document.getElementById('fechaHora').value = now.toISOString().slice(0,16);
+            document.getElementById('fechaSelector').value = now.toISOString().slice(0,10);
         }
         setearHoraActual();
 
-        // Control de Pestañas
-        function cambiarVista(idVista, elementoNav) {
-            document.querySelectorAll('.vista').forEach(el => el.classList.remove('activa'));
-            document.getElementById(idVista).classList.add('activa');
-            
-            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-            elementoNav.classList.add('active');
-
-            if(idVista === 'vista-resumen' || idVista === 'vista-historial') {
-                // En el próximo paso agregaremos la función para solicitar los datos a Google Sheets
-                console.log("Solicitando datos al servidor..."); 
-            }
+        function formatearFechaLatam(fechaString) {
+            const [year, month, day] = fechaString.split('-');
+            const date = new Date(year, month - 1, day);
+            return date.toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' });
         }
 
-        // Login Google
+        // --- NAVEGACIÓN Y SESIÓN ---
         function handleCredentialResponse(response) {
             tokenActivo = response.credential;
             document.getElementById('pantalla-login').style.display = 'none';
@@ -207,13 +221,23 @@
             document.getElementById('bottom-nav').style.display = 'flex';
         }
 
-        // Guardar Datos
-        async function registrarToma() {
-            if (!tokenActivo) {
-                alert("La sesión expiró. Vuelve a iniciar sesión.");
-                location.reload();
-                return;
+        async function cambiarVista(idVista, elementoNav) {
+            document.querySelectorAll('.vista').forEach(el => el.classList.remove('activa'));
+            document.getElementById(idVista).classList.add('activa');
+            
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            elementoNav.classList.add('active');
+
+            if (idVista === 'vista-resumen' || idVista === 'vista-historial') {
+                await obtenerDatosDelServidor();
+                if(idVista === 'vista-resumen') renderizarResumen();
+                if(idVista === 'vista-historial') renderizarHistorial();
             }
+        }
+
+        // --- COMUNICACIÓN CON EL SERVIDOR ---
+        async function registrarToma() {
+            if (!tokenActivo) { alert("Sesión expirada."); location.reload(); return; }
 
             const fechaHora = document.getElementById('fechaHora').value;
             const tipoLeche = document.querySelector('input[name="tipoLeche"]:checked').value;
@@ -222,43 +246,144 @@
 
             if(!fechaHora || !ml) {
                 msjEstado.innerText = "Por favor ingresa los mililitros.";
-                msjEstado.style.color = "#d9534f";
-                return;
+                msjEstado.style.color = "#d9534f"; return;
             }
 
             msjEstado.innerText = "Guardando registro...";
             msjEstado.style.color = "#333";
 
             const payload = {
-                accion: "registrar",
-                token: tokenActivo,
-                fechaHora: fechaHora,
-                tipoLeche: tipoLeche,
-                ml: parseInt(ml)
+                accion: "registrar", token: tokenActivo,
+                fechaHora: fechaHora, tipoLeche: tipoLeche, ml: parseInt(ml)
             };
 
             try {
                 const response = await fetch(urlBackend, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'text/plain' },
+                    method: 'POST', headers: { 'Content-Type': 'text/plain' },
                     body: JSON.stringify(payload)
                 });
-                
                 const data = await response.json();
                 
                 if (data.status === "ok") {
-                    msjEstado.innerText = "¡Toma guardada exitosamente!";
+                    msjEstado.innerText = "¡Toma guardada!";
                     msjEstado.style.color = "green";
                     document.getElementById('cantidadMl').value = ''; 
-                    setearHoraActual(); // Reinicia la hora actual
+                    setearHoraActual();
+                    datosCacheados = []; 
                     setTimeout(() => { msjEstado.innerText = ""; }, 3000);
                 } else {
                     msjEstado.innerText = "Error: " + data.error;
                 }
             } catch (error) {
-                msjEstado.innerText = "Error de conexión. Revisa tu internet.";
-                msjEstado.style.color = "#d9534f";
+                msjEstado.innerText = "Error de red."; msjEstado.style.color = "#d9534f";
             }
+        }
+
+        async function obtenerDatosDelServidor() {
+            if (datosCacheados.length > 0) return; 
+            
+            if (!tokenActivo) { alert("Sesión expirada."); location.reload(); return; }
+            
+            document.getElementById('contenido-resumen').innerHTML = "<p style='text-align:center;'>Descargando datos...</p>";
+            document.getElementById('contenido-historial').innerHTML = "<p style='text-align:center;'>Descargando datos...</p>";
+
+            const payload = { accion: "obtenerDatos", token: tokenActivo };
+
+            try {
+                const response = await fetch(urlBackend, {
+                    method: 'POST', headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await response.json();
+                if (data.status === "ok") {
+                    datosCacheados = data.datos; 
+                }
+            } catch (error) {
+                console.error("Error obteniendo datos");
+            }
+        }
+
+        // --- RENDERIZADO DE VISTAS ---
+        function renderizarResumen() {
+            const fechaSeleccionada = document.getElementById('fechaSelector').value; 
+            const contenedor = document.getElementById('contenido-resumen');
+            
+            const tomasDelDia = datosCacheados.filter(t => t.fechaHora.startsWith(fechaSeleccionada));
+
+            if (tomasDelDia.length === 0) {
+                contenedor.innerHTML = "<p style='text-align:center; color:#777;'>No hay registros para este día.</p>";
+                return;
+            }
+
+            let totalMaterna = 0;
+            let totalFormula = 0;
+
+            tomasDelDia.forEach(toma => {
+                if (toma.tipoLeche === "Materna") totalMaterna += toma.ml;
+                if (toma.tipoLeche === "Fórmula") totalFormula += toma.ml;
+            });
+
+            const html = `
+                <div class="tarjeta-dia">
+                    <h3>Totales del ${formatearFechaLatam(fechaSeleccionada)}</h3>
+                    <div class="fila-resumen"><span>Materna:</span> <span>${totalMaterna} ml</span></div>
+                    <div class="fila-resumen"><span>Fórmula:</span> <span>${totalFormula} ml</span></div>
+                    <div class="fila-resumen total-resumen"><span>Total General:</span> <span>${totalMaterna + totalFormula} ml</span></div>
+                </div>
+            `;
+            contenedor.innerHTML = html;
+        }
+
+        function renderizarHistorial() {
+            const contenedor = document.getElementById('contenido-historial');
+            if (datosCacheados.length === 0) {
+                contenedor.innerHTML = "<p style='text-align:center;'>No hay historial disponible.</p>";
+                return;
+            }
+
+            const historial = {};
+            
+            datosCacheados.forEach(toma => {
+                const [fechaStr, horaStr] = toma.fechaHora.split('T'); 
+                const mesAnio = fechaStr.substring(0, 7); 
+                
+                if (!historial[mesAnio]) historial[mesAnio] = {};
+                if (!historial[mesAnio][fechaStr]) historial[mesAnio][fechaStr] = [];
+                
+                historial[mesAnio][fechaStr].push({ hora: horaStr, tipo: toma.tipoLeche, ml: toma.ml });
+            });
+
+            let html = "";
+            
+            const mesesOrdenados = Object.keys(historial).sort().reverse();
+            
+            mesesOrdenados.forEach(mesStr => {
+                const [year, month] = mesStr.split('-');
+                const nombreMes = new Date(year, month - 1).toLocaleDateString('es-CL', { month: 'long', year: 'numeric' });
+                
+                html += `<div class="mes-header">${nombreMes.toUpperCase()}</div>`;
+                
+                const diasOrdenados = Object.keys(historial[mesStr]).sort().reverse();
+                
+                diasOrdenados.forEach(diaStr => {
+                    let totalDia = 0;
+                    let tomasHtml = "";
+                    
+                    historial[mesStr][diaStr].forEach(t => {
+                        totalDia += t.ml;
+                        tomasHtml += `<div class="toma-detalle">🕒 ${t.hora} - ${t.tipo} (${t.ml} ml)</div>`;
+                    });
+
+                    html += `
+                        <div class="tarjeta-dia">
+                            <h3>${formatearFechaLatam(diaStr)} <span style="float:right; font-size:0.9rem; background:var(--primary); color:white; padding:3px 8px; border-radius:12px;">${totalDia} ml</span></h3>
+                            ${tomasHtml}
+                        </div>
+                    `;
+                });
+            });
+
+            contenedor.innerHTML = html;
         }
     </script>
 </body>
