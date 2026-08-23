@@ -81,7 +81,6 @@
         .btn-guardar:active { background-color: #357ABD; }
         #mensaje-estado { text-align: center; font-weight: bold; margin-top: 15px; }
 
-        /* Estilos para Resumen e Historial */
         .tarjeta-dia {
             background-color: var(--card-bg);
             border-radius: 10px;
@@ -196,7 +195,51 @@
     <script>
         let tokenActivo = null;
         let datosCacheados = []; 
-        const urlBackend = "https://script.google.com/macros/s/AKfycbxe0n8cKsCSp81JcB2jHOtMfFbsHjVpNseDXnwl7tvEJXGbAf2DQPkPBUWwgXYpAAunMg/exec";
+        const urlBackend = "https://script.google.com/macros/s/AKfycby8FqN0jTCv4P7NIOu6QY655dujzkXGbLCnC3rEQ0wIgNSl4bvsMpoEcfWkAS4wX8gtbg/exec";
+
+        // --- MANEJO DE SESIÓN CON LOCALSTORAGE ---
+        function decodificarJWT(token) {
+            try {
+                const base64Url = token.split('.')[1];
+                const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+                const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+                    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                }).join(''));
+                return JSON.parse(jsonPayload);
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function inicializarSesion() {
+            const tokenGuardado = localStorage.getItem('conteo_token');
+            if (tokenGuardado) {
+                const payload = decodificarJWT(tokenGuardado);
+                // Multiplicamos por 1000 porque exp está en segundos y Date.now() en milisegundos
+                if (payload && (payload.exp * 1000) > Date.now()) {
+                    tokenActivo = tokenGuardado;
+                    mostrarInterfazApp();
+                } else {
+                    // El token expiró, lo limpiamos
+                    localStorage.removeItem('conteo_token');
+                }
+            }
+        }
+
+        function handleCredentialResponse(response) {
+            tokenActivo = response.credential;
+            localStorage.setItem('conteo_token', tokenActivo);
+            mostrarInterfazApp();
+        }
+
+        function mostrarInterfazApp() {
+            document.getElementById('pantalla-login').style.display = 'none';
+            document.getElementById('pantalla-app').style.display = 'block';
+            document.getElementById('bottom-nav').style.display = 'flex';
+        }
+
+        // Ejecutar inicialización al cargar la página
+        window.onload = inicializarSesion;
 
         // --- FUNCIONES DE UTILIDAD PARA FECHAS ---
         function setearHoraActual() {
@@ -213,14 +256,7 @@
             return date.toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' });
         }
 
-        // --- NAVEGACIÓN Y SESIÓN ---
-        function handleCredentialResponse(response) {
-            tokenActivo = response.credential;
-            document.getElementById('pantalla-login').style.display = 'none';
-            document.getElementById('pantalla-app').style.display = 'block';
-            document.getElementById('bottom-nav').style.display = 'flex';
-        }
-
+        // --- NAVEGACIÓN ---
         async function cambiarVista(idVista, elementoNav) {
             document.querySelectorAll('.vista').forEach(el => el.classList.remove('activa'));
             document.getElementById(idVista).classList.add('activa');
@@ -237,7 +273,12 @@
 
         // --- COMUNICACIÓN CON EL SERVIDOR ---
         async function registrarToma() {
-            if (!tokenActivo) { alert("Sesión expirada."); location.reload(); return; }
+            if (!tokenActivo) { 
+                alert("Sesión expirada. Vuelve a recargar e iniciar sesión."); 
+                localStorage.removeItem('conteo_token');
+                location.reload(); 
+                return; 
+            }
 
             const fechaHora = document.getElementById('fechaHora').value;
             const tipoLeche = document.querySelector('input[name="tipoLeche"]:checked').value;
@@ -282,7 +323,12 @@
         async function obtenerDatosDelServidor() {
             if (datosCacheados.length > 0) return; 
             
-            if (!tokenActivo) { alert("Sesión expirada."); location.reload(); return; }
+            if (!tokenActivo) { 
+                alert("Sesión expirada."); 
+                localStorage.removeItem('conteo_token');
+                location.reload(); 
+                return; 
+            }
             
             document.getElementById('contenido-resumen').innerHTML = "<p style='text-align:center;'>Descargando datos...</p>";
             document.getElementById('contenido-historial').innerHTML = "<p style='text-align:center;'>Descargando datos...</p>";
@@ -297,6 +343,10 @@
                 const data = await response.json();
                 if (data.status === "ok") {
                     datosCacheados = data.datos; 
+                } else if (data.error === "Usuario no autorizado o token inválido") {
+                    alert("Tu sesión caducó por seguridad de Google (1 hora). Inicia sesión nuevamente.");
+                    localStorage.removeItem('conteo_token');
+                    location.reload();
                 }
             } catch (error) {
                 console.error("Error obteniendo datos");
