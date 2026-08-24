@@ -39,7 +39,7 @@
         }
 
         label { font-weight: bold; font-size: 1.1rem; }
-        input[type="datetime-local"], input[type="number"], input[type="date"] {
+        input[type="datetime-local"], input[type="number"] {
             width: 100%;
             padding: 15px;
             margin: 10px 0 25px 0;
@@ -103,6 +103,7 @@
             text-align: center;
         }
         
+        /* Estilos para ítems del historial con botón de eliminar */
         .toma-detalle {
             display: flex;
             justify-content: space-between;
@@ -211,7 +212,7 @@
     <script>
         let tokenActivo = null;
         let datosCacheados = []; 
-        const urlBackend = "https://script.google.com/macros/s/AKfycbxoEMLWfOWsTBYKDLmPHWCOoUK_4oqSYlRhjGag-71bPSXwsdzXVfjSrXpX_FH7SYW05w/exec";
+        const urlBackend = "https://script.google.com/macros/s/AKfycbzKVmswFMR1yian8FWUIxdm09DWk0ys3rqUqAOEY5G3J_3M-XaHVJQJBfzLNJjV4NhcRA/exec";
 
         function decodificarJWT(token) {
             try {
@@ -260,9 +261,8 @@
         setearHoraActual();
 
         function formatearFechaLatam(fechaString) {
-            const partes = fechaString.split('-');
-            if(partes.length !== 3) return fechaString;
-            const date = new Date(parseInt(partes[0]), parseInt(partes[1]) - 1, parseInt(partes[2]));
+            const [year, month, day] = fechaString.split('-');
+            const date = new Date(year, month - 1, day);
             return date.toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' });
         }
 
@@ -274,7 +274,6 @@
             elementoNav.classList.add('active');
 
             if (idVista === 'vista-resumen' || idVista === 'vista-historial') {
-                datosCacheados = []; 
                 await obtenerDatosDelServidor();
                 if(idVista === 'vista-resumen') renderizarResumen();
                 if(idVista === 'vista-historial') renderizarHistorial();
@@ -347,6 +346,7 @@
             }
         }
 
+        // --- FUNCIÓN ELIMINAR TOMA ---
         async function eliminarToma(idUnico) {
             if (!confirm("¿Estás seguro de eliminar este registro?")) return;
 
@@ -360,8 +360,8 @@
                 const data = await response.json();
 
                 if (data.status === "ok") {
+                    // Borramos el elemento del caché local para actualizar la vista de inmediato sin recargar
                     datosCacheados = datosCacheados.filter(t => t.id !== idUnico);
-                    renderizarResumen();
                     renderizarHistorial();
                 } else {
                     alert("Error al eliminar: " + data.error);
@@ -372,22 +372,13 @@
         }
 
         function renderizarResumen() {
-            const fechaSeleccionada = document.getElementById('fechaSelector').value; // Ej: "2026-08-24"
+            const fechaSeleccionada = document.getElementById('fechaSelector').value; 
             const contenedor = document.getElementById('contenido-resumen');
             
-            if (datosCacheados.length === 0) {
-                contenedor.innerHTML = "<p style='text-align:center; color:#777;'>No hay registros.</p>";
-                return;
-            }
-
-            // Filtramos comparando de manera segura los primeros 10 caracteres (YYYY-MM-DD)
-            const tomasDelDia = datosCacheados.filter(t => {
-                const fechaToma = t.fechaHora.substring(0, 10);
-                return fechaToma === fechaSeleccionada;
-            });
+            const tomasDelDia = datosCacheados.filter(t => t.fechaHora.startsWith(fechaSeleccionada));
 
             if (tomasDelDia.length === 0) {
-                contenedor.innerHTML = `<p style='text-align:center; color:#777;'>No hay registros para el ${formatearFechaLatam(fechaSeleccionada)}.</p>`;
+                contenedor.innerHTML = "<p style='text-align:center; color:#777;'>No hay registros para este día.</p>";
                 return;
             }
 
@@ -420,11 +411,8 @@
             const historial = {};
             
             datosCacheados.forEach(toma => {
-                // Extraer de forma limpia la fecha (YYYY-MM-DD) y hora (HH:MM)
-                const partes = toma.fechaHora.split('T');
-                const fechaStr = partes[0] || "2026-01-01";
-                const horaStr = partes[1] ? partes[1].substring(0, 5) : "00:00";
-                const mesAnio = fechaStr.substring(0, 7); // Ej: "2026-08"
+                const [fechaStr, horaStr] = toma.fechaHora.split('T'); 
+                const mesAnio = fechaStr.substring(0, 7); 
                 
                 if (!historial[mesAnio]) historial[mesAnio] = {};
                 if (!historial[mesAnio][fechaStr]) historial[mesAnio][fechaStr] = [];
@@ -436,8 +424,8 @@
             const mesesOrdenados = Object.keys(historial).sort().reverse();
             
             mesesOrdenados.forEach(mesStr => {
-                const partesMes = mesStr.split('-');
-                const nombreMes = new Date(parseInt(partesMes[0]), parseInt(partesMes[1]) - 1, 1).toLocaleDateString('es-CL', { month: 'long', year: 'numeric' });
+                const [year, month] = mesStr.split('-');
+                const nombreMes = new Date(year, month - 1).toLocaleDateString('es-CL', { month: 'long', year: 'numeric' });
                 
                 html += `<div class="mes-header">${nombreMes.toUpperCase()}</div>`;
                 
