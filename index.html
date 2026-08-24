@@ -39,7 +39,7 @@
         }
 
         label { font-weight: bold; font-size: 1.1rem; }
-        input[type="datetime-local"], input[type="number"] {
+        input[type="datetime-local"], input[type="number"], input[type="date"] {
             width: 100%;
             padding: 15px;
             margin: 10px 0 25px 0;
@@ -103,7 +103,6 @@
             text-align: center;
         }
         
-        /* Estilos para ítems del historial con botón de eliminar */
         .toma-detalle {
             display: flex;
             justify-content: space-between;
@@ -346,7 +345,6 @@
             }
         }
 
-        // --- FUNCIÓN ELIMINAR TOMA ---
         async function eliminarToma(idUnico) {
             if (!confirm("¿Estás seguro de eliminar este registro?")) return;
 
@@ -360,7 +358,6 @@
                 const data = await response.json();
 
                 if (data.status === "ok") {
-                    // Borramos el elemento del caché local para actualizar la vista de inmediato sin recargar
                     datosCacheados = datosCacheados.filter(t => t.id !== idUnico);
                     renderizarHistorial();
                 } else {
@@ -411,7 +408,24 @@
             const historial = {};
             
             datosCacheados.forEach(toma => {
-                const [fechaStr, horaStr] = toma.fechaHora.split('T'); 
+                if (!toma.fechaHora) return;
+
+                let rawFechaHora = String(toma.fechaHora).trim();
+                let fechaStr = "2026-01-01";
+                let horaStr = "00:00";
+
+                if (rawFechaHora.includes('T')) {
+                    const partes = rawFechaHora.split('T');
+                    fechaStr = partes[0]; 
+                    horaStr = partes[1] ? partes[1].substring(0, 5) : "00:00"; 
+                } else if (rawFechaHora.includes(' ')) {
+                    const partes = rawFechaHora.split(' ');
+                    fechaStr = partes[0];
+                    horaStr = partes[1] ? partes[1].substring(0, 5) : "00:00";
+                } else {
+                    fechaStr = rawFechaHora.substring(0, 10);
+                }
+
                 const mesAnio = fechaStr.substring(0, 7); 
                 
                 if (!historial[mesAnio]) historial[mesAnio] = {};
@@ -424,8 +438,8 @@
             const mesesOrdenados = Object.keys(historial).sort().reverse();
             
             mesesOrdenados.forEach(mesStr => {
-                const [year, month] = mesStr.split('-');
-                const nombreMes = new Date(year, month - 1).toLocaleDateString('es-CL', { month: 'long', year: 'numeric' });
+                const partesMes = mesStr.split('-');
+                const nombreMes = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'][parseInt(partesMes[1]) - 1] + ' de ' + partesMes[0];
                 
                 html += `<div class="mes-header">${nombreMes.toUpperCase()}</div>`;
                 
