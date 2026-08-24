@@ -39,7 +39,7 @@
         }
 
         label { font-weight: bold; font-size: 1.1rem; }
-        input[type="datetime-local"], input[type="number"] {
+        input[type="datetime-local"], input[type="number"], input[type="date"] {
             width: 100%;
             padding: 15px;
             margin: 10px 0 25px 0;
@@ -211,7 +211,7 @@
     <script>
         let tokenActivo = null;
         let datosCacheados = []; 
-        const urlBackend = "https://script.google.com/macros/s/AKfycbwwuIgotZH2bEDd4yDacAL8FWmkLUSsrJ5_yFwBV3AeBYVvkZkv-36JD0z6afFtGLGU8A/exec";
+        const urlBackend = "https://script.google.com/macros/s/AKfycbxoEMLWfOWsTBYKDLmPHWCOoUK_4oqSYlRhjGag-71bPSXwsdzXVfjSrXpX_FH7SYW05w/exec";
 
         function decodificarJWT(token) {
             try {
@@ -260,8 +260,9 @@
         setearHoraActual();
 
         function formatearFechaLatam(fechaString) {
-            const [year, month, day] = fechaString.split('-');
-            const date = new Date(year, month - 1, day);
+            const partes = fechaString.split('-');
+            if(partes.length !== 3) return fechaString;
+            const date = new Date(parseInt(partes[0]), parseInt(partes[1]) - 1, parseInt(partes[2]));
             return date.toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' });
         }
 
@@ -360,6 +361,7 @@
 
                 if (data.status === "ok") {
                     datosCacheados = datosCacheados.filter(t => t.id !== idUnico);
+                    renderizarResumen();
                     renderizarHistorial();
                 } else {
                     alert("Error al eliminar: " + data.error);
@@ -370,13 +372,22 @@
         }
 
         function renderizarResumen() {
-            const fechaSeleccionada = document.getElementById('fechaSelector').value; 
+            const fechaSeleccionada = document.getElementById('fechaSelector').value; // Ej: "2026-08-24"
             const contenedor = document.getElementById('contenido-resumen');
             
-            const tomasDelDia = datosCacheados.filter(t => t.fechaHora.startsWith(fechaSeleccionada));
+            if (datosCacheados.length === 0) {
+                contenedor.innerHTML = "<p style='text-align:center; color:#777;'>No hay registros.</p>";
+                return;
+            }
+
+            // Filtramos comparando de manera segura los primeros 10 caracteres (YYYY-MM-DD)
+            const tomasDelDia = datosCacheados.filter(t => {
+                const fechaToma = t.fechaHora.substring(0, 10);
+                return fechaToma === fechaSeleccionada;
+            });
 
             if (tomasDelDia.length === 0) {
-                contenedor.innerHTML = "<p style='text-align:center; color:#777;'>No hay registros para este día.</p>";
+                contenedor.innerHTML = `<p style='text-align:center; color:#777;'>No hay registros para el ${formatearFechaLatam(fechaSeleccionada)}.</p>`;
                 return;
             }
 
@@ -409,11 +420,10 @@
             const historial = {};
             
             datosCacheados.forEach(toma => {
-                // Limpieza estricta de marcas de texto plano para que la hora coincida exactamente con la seleccionada
-                const fechaHoraLimpia = String(toma.fechaHora).replace(/^['"]/, '').replace('Z', '');
-                const partesFecha = fechaHoraLimpia.split('T');
-                const fechaStr = partesFecha[0]; // Ej: "2026-08-24"
-                const horaStr = partesFecha[1] ? partesFecha[1].substring(0, 5) : "00:00"; // Ej: "12:25"
+                // Extraer de forma limpia la fecha (YYYY-MM-DD) y hora (HH:MM)
+                const partes = toma.fechaHora.split('T');
+                const fechaStr = partes[0] || "2026-01-01";
+                const horaStr = partes[1] ? partes[1].substring(0, 5) : "00:00";
                 const mesAnio = fechaStr.substring(0, 7); // Ej: "2026-08"
                 
                 if (!historial[mesAnio]) historial[mesAnio] = {};
@@ -426,8 +436,8 @@
             const mesesOrdenados = Object.keys(historial).sort().reverse();
             
             mesesOrdenados.forEach(mesStr => {
-                const [year, month] = mesStr.split('-');
-                const nombreMes = new Date(year, month - 1, 1).toLocaleDateString('es-CL', { month: 'long', year: 'numeric' });
+                const partesMes = mesStr.split('-');
+                const nombreMes = new Date(parseInt(partesMes[0]), parseInt(partesMes[1]) - 1, 1).toLocaleDateString('es-CL', { month: 'long', year: 'numeric' });
                 
                 html += `<div class="mes-header">${nombreMes.toUpperCase()}</div>`;
                 
