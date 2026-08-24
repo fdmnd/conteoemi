@@ -103,7 +103,6 @@
             text-align: center;
         }
         
-        /* Estilos para ítems del historial con botón de eliminar */
         .toma-detalle {
             display: flex;
             justify-content: space-between;
@@ -274,6 +273,7 @@
             elementoNav.classList.add('active');
 
             if (idVista === 'vista-resumen' || idVista === 'vista-historial') {
+                datosCacheados = []; // Forzar recarga fresca de datos al cambiar de pestaña
                 await obtenerDatosDelServidor();
                 if(idVista === 'vista-resumen') renderizarResumen();
                 if(idVista === 'vista-historial') renderizarHistorial();
@@ -346,7 +346,6 @@
             }
         }
 
-        // --- FUNCIÓN ELIMINAR TOMA ---
         async function eliminarToma(idUnico) {
             if (!confirm("¿Estás seguro de eliminar este registro?")) return;
 
@@ -360,7 +359,6 @@
                 const data = await response.json();
 
                 if (data.status === "ok") {
-                    // Borramos el elemento del caché local para actualizar la vista de inmediato sin recargar
                     datosCacheados = datosCacheados.filter(t => t.id !== idUnico);
                     renderizarHistorial();
                 } else {
@@ -411,8 +409,11 @@
             const historial = {};
             
             datosCacheados.forEach(toma => {
-                const [fechaStr, horaStr] = toma.fechaHora.split('T'); 
-                const mesAnio = fechaStr.substring(0, 7); 
+                // Tratamiento seguro de fecha y hora como texto literal para evitar desfases UTC
+                const partesFecha = toma.fechaHora.split('T');
+                const fechaStr = partesFecha[0]; // Ej: "2026-08-24"
+                const horaStr = partesFecha[1] ? partesFecha[1].substring(0, 5) : "00:00"; // Ej: "12:15"
+                const mesAnio = fechaStr.substring(0, 7); // Ej: "2026-08"
                 
                 if (!historial[mesAnio]) historial[mesAnio] = {};
                 if (!historial[mesAnio][fechaStr]) historial[mesAnio][fechaStr] = [];
@@ -425,7 +426,7 @@
             
             mesesOrdenados.forEach(mesStr => {
                 const [year, month] = mesStr.split('-');
-                const nombreMes = new Date(year, month - 1).toLocaleDateString('es-CL', { month: 'long', year: 'numeric' });
+                const nombreMes = new Date(year, month - 1, 1).toLocaleDateString('es-CL', { month: 'long', year: 'numeric' });
                 
                 html += `<div class="mes-header">${nombreMes.toUpperCase()}</div>`;
                 
