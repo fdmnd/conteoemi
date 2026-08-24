@@ -211,7 +211,7 @@
     <script>
         let tokenActivo = null;
         let datosCacheados = []; 
-        const urlBackend = "https://script.google.com/macros/s/AKfycbxDSi2MwXxUVAvZr9nU3vi-PchUNUmIm5qThKEPPVsUzqKxTiaioHQ7fWziE_FDDUbA7A/exec";
+        const urlBackend = "https://script.google.com/macros/s/AKfycbwwuIgotZH2bEDd4yDacAL8FWmkLUSsrJ5_yFwBV3AeBYVvkZkv-36JD0z6afFtGLGU8A/exec";
 
         function decodificarJWT(token) {
             try {
@@ -273,7 +273,7 @@
             elementoNav.classList.add('active');
 
             if (idVista === 'vista-resumen' || idVista === 'vista-historial') {
-                datosCacheados = []; // Forzar recarga fresca de datos al cambiar de pestaña
+                datosCacheados = []; 
                 await obtenerDatosDelServidor();
                 if(idVista === 'vista-resumen') renderizarResumen();
                 if(idVista === 'vista-historial') renderizarHistorial();
@@ -409,10 +409,11 @@
             const historial = {};
             
             datosCacheados.forEach(toma => {
-                // Tratamiento seguro de fecha y hora como texto literal para evitar desfases UTC
-                const partesFecha = toma.fechaHora.split('T');
+                // Limpieza estricta de marcas de texto plano para que la hora coincida exactamente con la seleccionada
+                const fechaHoraLimpia = String(toma.fechaHora).replace(/^['"]/, '').replace('Z', '');
+                const partesFecha = fechaHoraLimpia.split('T');
                 const fechaStr = partesFecha[0]; // Ej: "2026-08-24"
-                const horaStr = partesFecha[1] ? partesFecha[1].substring(0, 5) : "00:00"; // Ej: "12:15"
+                const horaStr = partesFecha[1] ? partesFecha[1].substring(0, 5) : "00:00"; // Ej: "12:25"
                 const mesAnio = fechaStr.substring(0, 7); // Ej: "2026-08"
                 
                 if (!historial[mesAnio]) historial[mesAnio] = {};
