@@ -11,6 +11,7 @@
             --primary: #4A90E2;
             --materna-color: #ff9a9e;
             --formula-color: #a1c4fd;
+            --danger: #d9534f;
             --text-main: #333;
             --card-bg: #fff;
         }
@@ -101,12 +102,27 @@
             margin: 20px 0 10px 0;
             text-align: center;
         }
+        
+        /* Estilos para ítems del historial con botón de eliminar */
         .toma-detalle {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             font-size: 0.95rem;
-            color: #555;
-            padding: 3px 0;
+            color: #333;
+            padding: 8px 0;
             border-bottom: 1px dashed #eee;
         }
+        .btn-eliminar {
+            background-color: #ffcccc;
+            color: #a00;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 0.85rem;
+            font-weight: bold;
+        }
+        .btn-eliminar:active { background-color: var(--danger); color: white; }
 
         .bottom-nav {
             position: fixed;
@@ -178,7 +194,8 @@
         </div>
 
         <div id="vista-historial" class="vista container">
-            <h2>Historial por Mes</h2>
+            <h2>Historial y Edición</h2>
+            <p style="font-size: 0.9rem; color: #666; text-align: center; margin-bottom: 15px;">Aquí puedes revisar el detalle y eliminar registros erróneos.</p>
             <div id="contenido-historial">
                 <p style="text-align:center;">Cargando datos...</p>
             </div>
@@ -195,9 +212,8 @@
     <script>
         let tokenActivo = null;
         let datosCacheados = []; 
-        const urlBackend = "https://script.google.com/macros/s/AKfycbxT2bZJ_VLwF0onNjEjzWpu4HOrM40HbhF5dKm_7BM43zo6e-d83t4yS2EV8tRuGQ1W/exec";
+        const urlBackend = "https://script.google.com/macros/s/AKfycbxDSi2MwXxUVAvZr9nU3vi-PchUNUmIm5qThKEPPVsUzqKxTiaioHQ7fWziE_FDDUbA7A/exec";
 
-        // --- MANEJO DE SESIÓN CON LOCALSTORAGE ---
         function decodificarJWT(token) {
             try {
                 const base64Url = token.split('.')[1];
@@ -206,21 +222,17 @@
                     return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
                 }).join(''));
                 return JSON.parse(jsonPayload);
-            } catch (e) {
-                return null;
-            }
+            } catch (e) { return null; }
         }
 
         function inicializarSesion() {
             const tokenGuardado = localStorage.getItem('conteo_token');
             if (tokenGuardado) {
                 const payload = decodificarJWT(tokenGuardado);
-                // Multiplicamos por 1000 porque exp está en segundos y Date.now() en milisegundos
                 if (payload && (payload.exp * 1000) > Date.now()) {
                     tokenActivo = tokenGuardado;
                     mostrarInterfazApp();
                 } else {
-                    // El token expiró, lo limpiamos
                     localStorage.removeItem('conteo_token');
                 }
             }
@@ -238,10 +250,8 @@
             document.getElementById('bottom-nav').style.display = 'flex';
         }
 
-        // Ejecutar inicialización al cargar la página
         window.onload = inicializarSesion;
 
-        // --- FUNCIONES DE UTILIDAD PARA FECHAS ---
         function setearHoraActual() {
             const now = new Date();
             now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
@@ -256,7 +266,6 @@
             return date.toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' });
         }
 
-        // --- NAVEGACIÓN ---
         async function cambiarVista(idVista, elementoNav) {
             document.querySelectorAll('.vista').forEach(el => el.classList.remove('activa'));
             document.getElementById(idVista).classList.add('activa');
@@ -271,14 +280,8 @@
             }
         }
 
-        // --- COMUNICACIÓN CON EL SERVIDOR ---
         async function registrarToma() {
-            if (!tokenActivo) { 
-                alert("Sesión expirada. Vuelve a recargar e iniciar sesión."); 
-                localStorage.removeItem('conteo_token');
-                location.reload(); 
-                return; 
-            }
+            if (!tokenActivo) { alert("Sesión expirada."); localStorage.removeItem('conteo_token'); location.reload(); return; }
 
             const fechaHora = document.getElementById('fechaHora').value;
             const tipoLeche = document.querySelector('input[name="tipoLeche"]:checked').value;
@@ -322,13 +325,7 @@
 
         async function obtenerDatosDelServidor() {
             if (datosCacheados.length > 0) return; 
-            
-            if (!tokenActivo) { 
-                alert("Sesión expirada."); 
-                localStorage.removeItem('conteo_token');
-                location.reload(); 
-                return; 
-            }
+            if (!tokenActivo) { alert("Sesión expirada."); localStorage.removeItem('conteo_token'); location.reload(); return; }
             
             document.getElementById('contenido-resumen').innerHTML = "<p style='text-align:center;'>Descargando datos...</p>";
             document.getElementById('contenido-historial').innerHTML = "<p style='text-align:center;'>Descargando datos...</p>";
@@ -343,17 +340,37 @@
                 const data = await response.json();
                 if (data.status === "ok") {
                     datosCacheados = data.datos; 
-                } else if (data.error === "Usuario no autorizado o token inválido") {
-                    alert("Tu sesión caducó por seguridad de Google (1 hora). Inicia sesión nuevamente.");
-                    localStorage.removeItem('conteo_token');
-                    location.reload();
                 }
             } catch (error) {
                 console.error("Error obteniendo datos");
             }
         }
 
-        // --- RENDERIZADO DE VISTAS ---
+        // --- FUNCIÓN ELIMINAR TOMA ---
+        async function eliminarToma(idUnico) {
+            if (!confirm("¿Estás seguro de eliminar este registro?")) return;
+
+            const payload = { accion: "eliminar", token: tokenActivo, id: idUnico };
+
+            try {
+                const response = await fetch(urlBackend, {
+                    method: 'POST', headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await response.json();
+
+                if (data.status === "ok") {
+                    // Borramos el elemento del caché local para actualizar la vista de inmediato sin recargar
+                    datosCacheados = datosCacheados.filter(t => t.id !== idUnico);
+                    renderizarHistorial();
+                } else {
+                    alert("Error al eliminar: " + data.error);
+                }
+            } catch (error) {
+                alert("Error de conexión al intentar eliminar.");
+            }
+        }
+
         function renderizarResumen() {
             const fechaSeleccionada = document.getElementById('fechaSelector').value; 
             const contenedor = document.getElementById('contenido-resumen');
@@ -400,11 +417,10 @@
                 if (!historial[mesAnio]) historial[mesAnio] = {};
                 if (!historial[mesAnio][fechaStr]) historial[mesAnio][fechaStr] = [];
                 
-                historial[mesAnio][fechaStr].push({ hora: horaStr, tipo: toma.tipoLeche, ml: toma.ml });
+                historial[mesAnio][fechaStr].push({ id: toma.id, hora: horaStr, tipo: toma.tipoLeche, ml: toma.ml });
             });
 
             let html = "";
-            
             const mesesOrdenados = Object.keys(historial).sort().reverse();
             
             mesesOrdenados.forEach(mesStr => {
@@ -421,7 +437,12 @@
                     
                     historial[mesStr][diaStr].forEach(t => {
                         totalDia += t.ml;
-                        tomasHtml += `<div class="toma-detalle">🕒 ${t.hora} - ${t.tipo} (${t.ml} ml)</div>`;
+                        tomasHtml += `
+                            <div class="toma-detalle">
+                                <span>🕒 ${t.hora} - <b>${t.tipo}</b> (${t.ml} ml)</span>
+                                <button class="btn-eliminar" onclick="eliminarToma('${t.id}')">Eliminar</button>
+                            </div>
+                        `;
                     });
 
                     html += `
