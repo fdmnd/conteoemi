@@ -211,7 +211,7 @@
     <script>
         let tokenActivo = null;
         let datosCacheados = []; 
-        const urlBackend = "https://script.google.com/macros/s/AKfycbzX0Gp4AkrCuUQROyxduYCbyVcaMj-Q3FgzoigOYPiH_ypQIadRLxYfqt5OsQfZnm3Z-A/exec";
+        const urlBackend = "https://script.google.com/macros/s/AKfycbwZ9ZnRH5kaVHY3pf0i2xN4s-uS8S_NLXV-t-YPhG7zPSBCEzbBT_Bm9J-6Nk2Jy2njWw/exec";
 
         function decodificarJWT(token) {
             try {
@@ -273,6 +273,7 @@
             elementoNav.classList.add('active');
 
             if (idVista === 'vista-resumen' || idVista === 'vista-historial') {
+                datosCacheados = []; // Forzamos carga fresca
                 await obtenerDatosDelServidor();
                 if(idVista === 'vista-resumen') renderizarResumen();
                 if(idVista === 'vista-historial') renderizarHistorial();
@@ -359,6 +360,7 @@
 
                 if (data.status === "ok") {
                     datosCacheados = datosCacheados.filter(t => t.id !== idUnico);
+                    renderizarResumen();
                     renderizarHistorial();
                 } else {
                     alert("Error al eliminar: " + data.error);
@@ -372,6 +374,7 @@
             const fechaSeleccionada = document.getElementById('fechaSelector').value; 
             const contenedor = document.getElementById('contenido-resumen');
             
+            // Filtro extremadamente simple gracias a que el backend entrega el texto limpio
             const tomasDelDia = datosCacheados.filter(t => t.fechaHora.startsWith(fechaSeleccionada));
 
             if (tomasDelDia.length === 0) {
@@ -408,32 +411,11 @@
             const historial = {};
             
             datosCacheados.forEach(toma => {
-                if (!toma.fechaHora) return;
-
-                let rawFechaHora = String(toma.fechaHora).trim();
-                let fechaStr = "2026-01-01";
-                let horaStr = "00:00";
-
-                if (rawFechaHora.includes('T')) {
-                    const partes = rawFechaHora.split('T');
-                    fechaStr = partes[0]; 
-                    horaStr = partes[1] ? partes[1].substring(0, 5) : "00:00"; 
-                } else if (rawFechaHora.includes(' ')) {
-                    const partes = rawFechaHora.split(' ');
-                    fechaStr = partes[0];
-                    horaStr = partes[1] ? partes[1].substring(0, 5) : "00:00";
-                } else {
-                    fechaStr = rawFechaHora.substring(0, 10);
-                }
-
-                // CORRECCIÓN QUIRÚRGICA DE HORA: Restamos las 4 horas de desfase UTC del servidor
-                if (horaStr.includes(':')) {
-                    let [hh, mm] = horaStr.split(':').map(Number);
-                    hh = hh - 4;
-                    if (hh < 0) { hh += 24; }
-                    horaStr = String(hh).padStart(2, '0') + ':' + String(mm).padStart(2, '0');
-                }
-
+                // Como el backend ya envía "YYYY-MM-DDTHH:mm", lo partimos de forma directa
+                const partes = toma.fechaHora.split('T');
+                const fechaStr = partes[0]; 
+                const horaStr = partes[1].substring(0, 5); // Tomamos directo las horas y minutos
+                
                 const mesAnio = fechaStr.substring(0, 7); 
                 
                 if (!historial[mesAnio]) historial[mesAnio] = {};
@@ -446,8 +428,8 @@
             const mesesOrdenados = Object.keys(historial).sort().reverse();
             
             mesesOrdenados.forEach(mesStr => {
-                const partesMes = mesStr.split('-');
-                const nombreMes = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'][parseInt(partesMes[1]) - 1] + ' de ' + partesMes[0];
+                const [year, month] = mesStr.split('-');
+                const nombreMes = new Date(year, month - 1, 1).toLocaleDateString('es-CL', { month: 'long', year: 'numeric' });
                 
                 html += `<div class="mes-header">${nombreMes.toUpperCase()}</div>`;
                 
